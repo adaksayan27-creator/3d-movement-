@@ -6,8 +6,8 @@ public class AimStateManager : MonoBehaviour
     [Header("Sensitivity & Limits")]
     [Tooltip("Adjust mouse look sensitivity")]
     public float mouseSensitivity = 0.15f;
-    public float yMinAngle = -25f; // looking up
-    public float yMaxAngle = 50f;  // looking down
+    public float yMinAngle = -25f;
+    public float yMaxAngle = 50f;
     public bool invertY = false;
 
     [Header("Camera Settings")]
@@ -30,7 +30,6 @@ public class AimStateManager : MonoBehaviour
         cam = Camera.main;
         if (cam != null)
         {
-            // Disable CinemachineBrain if attached to Main Camera so it doesn't freeze camera position
             var brain = cam.GetComponent("CinemachineBrain") as Behaviour;
             if (brain != null)
             {
@@ -38,7 +37,6 @@ public class AimStateManager : MonoBehaviour
             }
         }
 
-        // Disable any CinemachineCamera in scene to guarantee no camera conflicts
         var cmCam = GameObject.Find("CinemachineCamera");
         if (cmCam != null)
         {
@@ -57,7 +55,6 @@ public class AimStateManager : MonoBehaviour
         if (cam == null) cam = Camera.main;
         if (cam != null)
         {
-            // Position camera behind player immediately on start
             Quaternion camRot = Quaternion.Euler(pitch, yaw, 0f);
             Vector3 pivot = transform.position + (Quaternion.Euler(0f, yaw, 0f) * shoulderOffset);
             cam.transform.position = pivot - (camRot * Vector3.forward * cameraDistance);
@@ -101,22 +98,15 @@ public class AimStateManager : MonoBehaviour
 
     void LateUpdate()
     {
-        // 1. Rotate player character horizontally with mouse (standard PC third-person action)
         transform.rotation = Quaternion.Euler(0f, yaw, 0f);
 
         if (cam == null) cam = Camera.main;
         if (cam == null) return;
 
-        // 2. Camera rotation (pitch + yaw)
         Quaternion camRotation = Quaternion.Euler(pitch, yaw, 0f);
-
-        // 3. Camera pivot over player's right shoulder
         Vector3 pivot = transform.position + (Quaternion.Euler(0f, yaw, 0f) * shoulderOffset);
-
-        // 4. Desired camera position behind the player
         Vector3 targetPos = pivot - (camRotation * Vector3.forward * cameraDistance);
 
-        // 5. Collision check against terrain/ground so camera never dips into ground
         int groundMask = LayerMask.GetMask("Ground");
         if (groundMask == 0) groundMask = 1 << 6;
         if (Physics.SphereCast(pivot, 0.2f, (targetPos - pivot).normalized, out RaycastHit hit, cameraDistance, groundMask))
@@ -124,7 +114,6 @@ public class AimStateManager : MonoBehaviour
             targetPos = pivot + (targetPos - pivot).normalized * Mathf.Max(hit.distance - 0.1f, 0.5f);
         }
 
-        // 6. Smoothly follow player and look forward
         cam.transform.position = Vector3.SmoothDamp(cam.transform.position, targetPos, ref cameraVelocity, cameraSmoothTime);
         cam.transform.rotation = camRotation;
     }

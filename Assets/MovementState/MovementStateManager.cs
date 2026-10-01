@@ -29,7 +29,6 @@ public class MovementStateManager : MonoBehaviour
     [HideInInspector] public CharacterController controller;
     [HideInInspector] public AimStateManager aimState;
 
-    // Finite State Machine States
     private MovementBaseState currentState;
     public IdleState idle = new IdleState();
     public Walkstate walk = new Walkstate();
@@ -42,13 +41,11 @@ public class MovementStateManager : MonoBehaviour
         anim = GetComponentInChildren<Animator>();
         aimState = GetComponent<AimStateManager>();
 
-        // Disable root motion so animation clip translations don't interfere with CharacterController
         if (anim != null)
         {
             anim.applyRootMotion = false;
         }
 
-        // Configure CharacterController to avoid snagging on terrain geometry
         if (controller != null)
         {
             controller.stepOffset = 0.3f;
@@ -60,7 +57,6 @@ public class MovementStateManager : MonoBehaviour
 
     void Start()
     {
-        // Default state
         SwitchState(idle);
     }
 
@@ -68,16 +64,13 @@ public class MovementStateManager : MonoBehaviour
     {
         ReadInput();
 
-        // 1. Update State first so movementspeed and animations match current frame input
         if (currentState != null)
         {
             currentState.UpdateState(this);
         }
 
-        // 2. Apply movement using CharacterController SimpleMove (natively handles gravity, slopes, stepOffset without seam freezing)
         ApplyMovement();
 
-        // 3. Feed input into blend tree
         UpdateAnimator();
     }
 
@@ -117,8 +110,6 @@ public class MovementStateManager : MonoBehaviour
     {
         if (controller == null || !controller.enabled) return;
 
-        // Direction relative to player facing direction:
-        // W = forward, S = backward, D = right, A = left
         Vector3 moveDir = transform.forward * currentInput.y + transform.right * currentInput.x;
         if (moveDir.sqrMagnitude > 1f)
         {
@@ -130,7 +121,6 @@ public class MovementStateManager : MonoBehaviour
         float speed = movementspeed * Mathf.Clamp01(currentInput.magnitude);
         Vector3 velocity = moveDir * speed;
 
-        // SimpleMove automatically applies gravity and handles slope sliding, ground contact, and stepOffset in PhysX
         isGrounded = controller.SimpleMove(velocity);
     }
 
@@ -138,7 +128,6 @@ public class MovementStateManager : MonoBehaviour
     {
         if (anim == null) return;
 
-        // Feed horizontal and vertical inputs into 2D strafe blend tree
         anim.SetFloat("horizontalInput", horizontalInput);
         anim.SetFloat("verticalInput", verticalInput);
     }

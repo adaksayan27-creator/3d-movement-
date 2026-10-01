@@ -16,14 +16,12 @@ public class IdleState : MovementBaseState
 
     public override void UpdateState(MovementStateManager movement)
     {
-        // When C is pressed to crouch
         if (Keyboard.current != null && Keyboard.current.cKey.wasPressedThisFrame)
         {
             movement.SwitchState(movement.crouch);
             return;
         }
 
-        // When movement keys are pressed
         if (movement.hasInput)
         {
             if (Keyboard.current != null && Keyboard.current.leftShiftKey.isPressed)

@@ -13,10 +13,8 @@ public class Crouchstate : MovementBaseState
             movement.anim.SetBool("Crouching", true);
         }
     }
-
     public override void UpdateState(MovementStateManager movement)
     {
-        // Press C to toggle out of crouch
         if (Keyboard.current != null && Keyboard.current.cKey.wasPressedThisFrame)
         {
             if (movement.hasInput)
@@ -37,7 +35,6 @@ public class Crouchstate : MovementBaseState
             return;
         }
 
-        // Sprinting breaks out of crouch
         if (Keyboard.current != null && Keyboard.current.leftShiftKey.isPressed && movement.hasInput)
         {
             movement.SwitchState(movement.run);
