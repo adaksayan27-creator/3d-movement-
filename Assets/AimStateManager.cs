@@ -3,35 +3,129 @@ using UnityEngine.InputSystem;
 
 public class AimStateManager : MonoBehaviour
 {
-    public float xSensitivity = 0.3f;
-    public float ySensitivity = 0.3f;
-    public float yMinAngle = -80f;
-    public float yMaxAngle = 80f;
+    [Header("Sensitivity & Limits")]
+    [Tooltip("Adjust mouse look sensitivity")]
+    public float mouseSensitivity = 0.15f;
+    public float yMinAngle = -25f; // looking up
+    public float yMaxAngle = 50f;  // looking down
+    public bool invertY = false;
 
-    private float xValue;
-    private float yValue;
+    [Header("Camera Settings")]
+    [Tooltip("Over-the-shoulder offset relative to player")]
+    public Vector3 shoulderOffset = new Vector3(0.45f, 1.45f, 0f);
+    [Tooltip("Distance behind the player")]
+    public float cameraDistance = 3.2f;
+    [Tooltip("Position smoothing time")]
+    public float cameraSmoothTime = 0.03f;
 
-    [SerializeField] Transform cameraFollowPos;
+    [Header("Current Angles (Read-Only)")]
+    public float yaw;
+    public float pitch;
+
+    private Camera cam;
+    private Vector3 cameraVelocity;
+
+    void Awake()
+    {
+        cam = Camera.main;
+        if (cam != null)
+        {
+            // Disable CinemachineBrain if attached to Main Camera so it doesn't freeze camera position
+            var brain = cam.GetComponent("CinemachineBrain") as Behaviour;
+            if (brain != null)
+            {
+                brain.enabled = false;
+            }
+        }
+
+        // Disable any CinemachineCamera in scene to guarantee no camera conflicts
+        var cmCam = GameObject.Find("CinemachineCamera");
+        if (cmCam != null)
+        {
+            cmCam.SetActive(false);
+        }
+    }
 
     void Start()
     {
-        xValue = transform.localEulerAngles.y;
-        yValue = -cameraFollowPos.localEulerAngles.x;
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+
+        yaw = transform.eulerAngles.y;
+        pitch = 12f;
+
+        if (cam == null) cam = Camera.main;
+        if (cam != null)
+        {
+            // Position camera behind player immediately on start
+            Quaternion camRot = Quaternion.Euler(pitch, yaw, 0f);
+            Vector3 pivot = transform.position + (Quaternion.Euler(0f, yaw, 0f) * shoulderOffset);
+            cam.transform.position = pivot - (camRot * Vector3.forward * cameraDistance);
+            cam.transform.rotation = camRot;
+        }
     }
 
-    // Update is called once per frame
     void Update()
     {
-        Vector2 mouseDelta = Mouse.current.delta.ReadValue();
-
-        xValue += mouseDelta.x * xSensitivity;
-        yValue += mouseDelta.y * ySensitivity;
-        yValue = Mathf.Clamp(yValue, yMinAngle, yMaxAngle);
+        HandleCursorLock();
+        HandleMouseLook();
     }
 
-    private void LateUpdate()
+    void HandleCursorLock()
     {
-        cameraFollowPos.localEulerAngles = new Vector3(-yValue, cameraFollowPos.localEulerAngles.y, cameraFollowPos.localEulerAngles.z);
-        transform.localEulerAngles = new Vector3(transform.localEulerAngles.x, xValue, transform.localEulerAngles.z);
+        if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+        else if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame && Cursor.lockState != CursorLockMode.Locked)
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
+    }
+
+    void HandleMouseLook()
+    {
+        if (Mouse.current != null && Cursor.lockState == CursorLockMode.Locked)
+        {
+            Vector2 mouseDelta = Mouse.current.delta.ReadValue();
+
+            yaw += mouseDelta.x * mouseSensitivity;
+
+            float yChange = mouseDelta.y * mouseSensitivity * (invertY ? 1f : -1f);
+            pitch += yChange;
+            pitch = Mathf.Clamp(pitch, yMinAngle, yMaxAngle);
+        }
+    }
+
+    void LateUpdate()
+    {
+        // 1. Rotate player character horizontally with mouse (standard PC third-person action)
+        transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+
+        if (cam == null) cam = Camera.main;
+        if (cam == null) return;
+
+        // 2. Camera rotation (pitch + yaw)
+        Quaternion camRotation = Quaternion.Euler(pitch, yaw, 0f);
+
+        // 3. Camera pivot over player's right shoulder
+        Vector3 pivot = transform.position + (Quaternion.Euler(0f, yaw, 0f) * shoulderOffset);
+
+        // 4. Desired camera position behind the player
+        Vector3 targetPos = pivot - (camRotation * Vector3.forward * cameraDistance);
+
+        // 5. Collision check against terrain/ground so camera never dips into ground
+        int groundMask = LayerMask.GetMask("Ground");
+        if (groundMask == 0) groundMask = 1 << 6;
+        if (Physics.SphereCast(pivot, 0.2f, (targetPos - pivot).normalized, out RaycastHit hit, cameraDistance, groundMask))
+        {
+            targetPos = pivot + (targetPos - pivot).normalized * Mathf.Max(hit.distance - 0.1f, 0.5f);
+        }
+
+        // 6. Smoothly follow player and look forward
+        cam.transform.position = Vector3.SmoothDamp(cam.transform.position, targetPos, ref cameraVelocity, cameraSmoothTime);
+        cam.transform.rotation = camRotation;
     }
 }
